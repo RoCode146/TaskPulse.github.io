@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="TaskPulse: A powerful, responsive to-do list app to manage tasks with priorities, due dates, and filters. Stay organized with dark mode, sorting, and real-time task tracking.">
+  <meta name="keywords" content="TaskPulse, to-do list, task manager, productivity, organize tasks, priority tasks, due dates, dark mode">
+  <meta name="author" content="Rohit_Sutar">
+  <title>TaskPulse</title>
+  <style>
+    :root {
+      --primary: #006D77;
+      --secondary: #83C5BE;
+      --bg: #EDF6F9;
+      --text: #2E3532;
+      --high: #FF6B6B;
+      --medium: #FFD166;
+      --low: #95E1D3;
+      --delete: #E84855;
+      --white: #FFFFFF;
+    }
+    body {
+      font-family: 'Roboto', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 15px;
+      transition: background 0.3s, color 0.3s;
+    }
+    body.dark {
+      --bg: #2E3532;
+      --text: #EDF6F9;
+      --white: #3A423F;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: var(--white);
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 20px;
+    }
+    .input-group, .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    input, select, button {
+      padding: 10px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    input[type="text"] { flex: 1; min-width: 200px; }
+    input[type="date"] { min-width: 150px; }
+    select { min-width: 120px; }
+    button {
+      background: var(--primary);
+      color: var(--white);
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover:not(:disabled) { background: #005A63; }
+    button:disabled { background: #a0a0a0; cursor: not-allowed; }
+    .clear-all { background: var(--delete); }
+    .clear-all:hover:not(:disabled) { background: #D13C47; }
+    .dark-toggle { background: var(--secondary); }
+    .dark-toggle:hover { background: #6FAFA8; }
+    ul {
+      list-style: none;
+      padding: 0;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    li {
+      padding: 12px;
+      margin: 8px 0;
+      display: flex;
+      align-items: center;
+      border-radius: 6px;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    li.high { background: var(--high); }
+    li.medium { background: var(--medium); }
+    li.low { background: var(--low); }
+    li.overdue { border: 2px solid var(--delete); }
+    li.completed span { text-decoration: line-through; opacity: 0.7; }
+    input[type="checkbox"] { margin-right: 10px; }
+    span { flex-grow: 1; text-align: left; cursor: pointer; }
+    .delete-btn {
+      background: var(--delete);
+      color: var(--white);
+      border: none;
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+    .delete-btn:hover { background: #D13C47; }
+    .stats { font-size: 0.9rem; margin-top: 15px; }
+    @media (max-width: 600px) {
+      .container { padding: 15px; }
+      h1 { font-size: 1.5rem; }
+      input, select, button { width: 100%; margin: 5px 0; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>TaskPulse</h1>
+    <div class="input-group">
+      <input type="text" id="taskInput" placeholder="Add a new task">
+      <input type="date" id="dueDate">
+      <select id="prioritySelect">
+        <option value="high">High Priority</option>
+        <option value="medium">Medium Priority</option>
+        <option value="low" selected>Low Priority</option>
+      </select>
+      <button id="addTaskBtn" disabled>Add Task</button>
+    </div>
+    <div class="filter-group">
+      <select id="filterSelect">
+        <option value="all">All Tasks</option>
+        <option value="high">High Priority</option>
+        <option value="medium">Medium Priority</option>
+        <option value="low">Low Priority</option>
+        <option value="completed">Completed</option>
+        <option value="pending">Pending</option>
+      </select>
+      <select id="sortSelect">
+        <option value="default">Default Order</option>
+        <option value="priority">Priority</option>
+        <option value="dueDate">Due Date</option>
+      </select>
+      <button id="darkToggle" class="dark-toggle">Dark Mode</button>
+      <button class="clear-all" id="clearAllBtn">Clear All</button>
+    </div>
+    <ul id="taskList"></ul>
+    <div class="stats" id="taskStats"></div>
+  </div>
+
+  <script>
+    // DOM Elements
+    const taskInput = document.getElementById('taskInput');
+    const dueDateInput = document.getElementById('dueDate');
+    const prioritySelect = document.getElementById('prioritySelect');
+    const addTaskBtn = document.getElementById('addTaskBtn');
+    const filterSelect = document.getElementById('filterSelect');
+    const sortSelect = document.getElementById('sortSelect');
+    const darkToggle = document.getElementById('darkToggle');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const taskList = document.getElementById('taskList');
+    const taskStats = document.getElementById('taskStats');
+    const today = new Date().toISOString().split('T')[0];
+    dueDateInput.value = today;
+
+    // Load tasks on startup
+    document.addEventListener('DOMContentLoaded', renderTasks);
+
+    // Enable/disable Add Task button
+    taskInput.addEventListener('input', () => {
+      addTaskBtn.disabled = taskInput.value.trim() === '';
+    });
+
+    // Add Task
+    addTaskBtn.addEventListener('click', addTask);
+    taskInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !addTaskBtn.disabled) addTask();
+    });
+
+    // Filter and Sort listeners
+    filterSelect.addEventListener('change', renderTasks);
+    sortSelect.addEventListener('change', renderTasks);
+
+    // Dark Mode Toggle
+    darkToggle.addEventListener('click', () => {
+      document.body.classList.toggle('dark');
+      darkToggle.textContent = document.body.classList.contains('dark') ? 'Light Mode' : 'Dark Mode';
+    });
+
+    // Clear All
+    clearAllBtn.addEventListener('click', () => {
+      if (confirm('Clear all tasks?')) {
+        localStorage.removeItem('tasks');
+        renderTasks();
+      }
+    });
+
+    // Add Task Function
+    function addTask() {
+      const tasks = getTasks();
+      tasks.push({
+        text: taskInput.value.trim(),
+        priority: prioritySelect.value,
+        due: dueDateInput.value || '',
+        completed: false,
+        id: Date.now() // Unique ID for tracking
+      });
+      saveTasks(tasks);
+      taskInput.value = '';
+      dueDateInput.value = today;
+      addTaskBtn.disabled = true;
+      renderTasks();
+    }
+
+    // Create Task Element
+    function createTaskElement(task) {
+      const li = document.createElement('li');
+      li.className = task.priority;
+      li.dataset.id = task.id;
+      if (task.due && task.due < today && !task.completed) li.classList.add('overdue');
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = task.completed;
+      checkbox.addEventListener('change', () => {
+        const tasks = getTasks();
+        const taskToUpdate = tasks.find(t => t.id === task.id);
+        taskToUpdate.completed = checkbox.checked;
+        saveTasks(tasks);
+        renderTasks();
+      });
+
+      const span = document.createElement('span');
+      span.textContent = task.text + (task.due ? ` (Due: ${task.due})` : '');
+      span.addEventListener('dblclick', () => {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = task.text;
+        input.addEventListener('blur', () => {
+          const tasks = getTasks();
+          const taskToUpdate = tasks.find(t => t.id === task.id);
+          taskToUpdate.text = input.value.trim() || task.text;
+          saveTasks(tasks);
+          renderTasks();
+        });
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') input.blur();
+        });
+        li.replaceChild(input, span);
+        input.focus();
+      });
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'X';
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.addEventListener('click', () => {
+        const tasks = getTasks();
+        const updatedTasks = tasks.filter(t => t.id !== task.id);
+        saveTasks(updatedTasks);
+        renderTasks();
+      });
+
+      li.appendChild(checkbox);
+      li.appendChild(span);
+      li.appendChild(deleteBtn);
+      if (task.completed) li.classList.add('completed');
+      return li;
+    }
+
+    // Get Tasks
+    function getTasks() {
+      return JSON.parse(localStorage.getItem('tasks') || '[]');
+    }
+
+    // Save Tasks
+    function saveTasks(tasks) {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+    }
+
+    // Render Tasks
+    function renderTasks() {
+      const tasks = getTasks();
+      const filter = filterSelect.value;
+      const sort = sortSelect.value;
+
+      // Filter
+      const filteredTasks = tasks.filter(task => {
+        if (filter === 'all') return true;
+        if (filter === 'high') return task.priority === 'high';
+        if (filter === 'medium') return task.priority === 'medium';
+        if (filter === 'low') return task.priority === 'low';
+        if (filter === 'completed') return task.completed;
+        if (filter === 'pending') return !task.completed;
+        return true;
+      });
+
+      // Sort
+      filteredTasks.sort((a, b) => {
+        if (sort === 'priority') {
+          const priorities = { high: 3, medium: 2, low: 1 };
+          return priorities[b.priority] - priorities[a.priority];
+        }
+        if (sort === 'dueDate') {
+          const aDue = a.due || '9999-12-31';
+          const bDue = b.due || '9999-12-31';
+          return aDue.localeCompare(bDue);
+        }
+        return 0; // Default preserves original order
+      });
+
+      // Render
+      taskList.innerHTML = '';
+      filteredTasks.forEach(task => taskList.appendChild(createTaskElement(task)));
+
+      // Update Stats
+      const total = filteredTasks.length;
+      const completed = filteredTasks.filter(t => t.completed).length;
+      taskStats.textContent = `Total: ${total} | Completed: ${completed}`;
+    }
+  </script>
+</body>
+</html>
